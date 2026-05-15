@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Impostor</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #0e0e12; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden;
+    overscroll-behavior: none; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 24px; text-align: center; }
+  .hidden { display: none !important; }
+  h1 { font-size: 42px; margin: 0 0 24px; letter-spacing: 2px; }
+  h2 { font-size: 22px; margin: 0 0 12px; font-weight: 500; color: #aaa; }
+  .big { font-size: 42px; font-weight: 700; line-height: 1.2; padding: 0 12px; }
+  .impostor { color: #ff3b3b; font-size: 72px; font-weight: 900; letter-spacing: 4px; }
+  input[type=number] { font-size: 56px; width: 160px; text-align: center;
+    background: #1c1c24; color: #fff; border: 2px solid #333; border-radius: 12px;
+    padding: 12px; margin: 16px 0; }
+  button { font-size: 22px; padding: 18px 32px; border-radius: 14px; border: none;
+    background: #4a6cff; color: #fff; font-weight: 600; margin: 8px; cursor: pointer;
+    min-width: 200px; font-family: inherit; }
+  button.secondary { background: #2a2a35; }
+  button:active { transform: scale(0.97); }
+  .hold-btn { background: #ff8a00; font-size: 28px; padding: 32px 48px;
+    border-radius: 100px; width: 80%; max-width: 360px; touch-action: none; }
+  .hold-btn.active { background: #ff3b3b; }
+  .info { color: #888; font-size: 16px; margin-top: 24px; max-width: 420px; }
+  .reveal { padding: 24px; }
+  .small { font-size: 14px; color: #666; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="setup" class="screen">
+  <h1>IMPOSTOR</h1>
+  <h2>Hur många spelare?</h2>
+  <input id="players" type="number" min="3" max="20" value="5" inputmode="numeric">
+  <div class="small">3–20 spelare</div>
+  <button onclick="startGame()">Starta spelet</button>
+  <div class="info">
+    3–6 spelare: 1 impostor<br>
+    7–12 spelare: 2 impostors<br>
+    13–20 spelare: 3 impostors
+  </div>
+</div>
+
+<div id="pass" class="screen hidden">
+  <h2 id="playerLabel">Spelare 1 av 5</h2>
+  <p class="info">Lämna mobilen till spelaren och håll in knappen för att se din roll.</p>
+  <button class="hold-btn" id="holdBtn">HÅLL IN FÖR ATT SE</button>
+  <div style="margin-top:24px">
+    <button class="secondary" onclick="nextPlayer()">Nästa spelare →</button>
+  </div>
+</div>
+
+<div id="reveal" class="screen hidden">
+  <div id="revealContent" class="reveal"></div>
+</div>
+
+<div id="done" class="screen hidden">
+  <h1>KÖR!</h1>
+  <h2>Alla har sett sin roll</h2>
+  <p class="info">
+    Spela en låt var i tur och ordning som matchar påståendet.
+    Impostorn försöker smälta in. Efter alla låtar — rösta fram impostorn!
+  </p>
+  <button onclick="newRound()">Ny runda (samma spelare)</button>
+  <button class="secondary" onclick="location.reload()">Nytt spel</button>
+</div>
+
+<script>
+const PROMPTS = [
+  "Sätt på en låt du hade satt på om du åkte från polisen",
+  "Känslan när du åker bil sent på natten",
+  "Rik",
+  "Den första låten på förfesten",
+  "En låt du dansar till när ingen ser",
+  "Låten som spelar när du går in på klubben",
+  "Att vara kär för första gången",
+  "En låt till en breakup",
+  "Sommarminne från high school",
+  "Den ultimata gymlåten",
+  "Att vakna upp brutalt bakis",
+  "Låten du skäms över att gilla",
+  "En låt till en road trip genom Sverige",
+  "När du ser ditt ex på stan",
+  "En låt som beskriver din barndom",
+  "Eftersläpp klockan fyra på natten",
+  "Förkrossad",
+  "En låt till en bilkrock i slow motion",
+  "När mamma kommer hem mitt under förfesten",
+  "En låt du hade gått ner för altargången till",
+  "Skön söndagsmorgon",
+  "Att kröna sig själv till kung eller drottning",
+  "En låt till en TikTok-dans",
+  "När du fått överraskande bra betyg på tentan",
+  "Plugga på biblioteket klockan elva på kvällen",
+  "En låt till en hämnd-arc",
+  "Att vara den fulaste personen på festen",
+  "En låt till en main character moment",
+  "Regnig dag i Stockholm",
+  "När du svikit din bästa vän",
+  "En låt till ett glow up-montage",
+  "Att vara förälskad i någon som inte vet att du finns",
+  "En låt till en boss fight",
+  "Festen som gick för långt",
+  "En låt till en simbassäng i södra Spanien",
+  "Hemkomsten efter utbytesåret",
+  "En låt du hade gjort entré till",
+  "När du blir ghostad",
+  "En låt till din villain-era",
+  "Singel och fri",
+  "Att en dag bli förälder",
+  "En låt till bilfärden hem från Liseberg",
+  "Toxic relationship",
+  "En låt till after-après-ski",
+  "När du fyller 30",
+  "En heartbreak du aldrig kommer över",
+  "Att möta sitt yngre jag",
+  "Ett montage där du blir framgångsrik",
+  "Bästisens bröllop",
+  "En sista dans-stund",
+  "När du kysser någon i regnet",
+  "En låt som doftar sommar",
+  "Vinternatt i Norrland",
+  "En after movie",
+  "Kärlek vid första ögonkastet",
+  "Tonårsångest",
+  "En låt till första dagen på nya jobbet",
+  "Att åka tunnelbana hem ensam kl 03",
+  "En låt till en duschsession där du gråter",
+  "När du springer för att hinna med sista pendeln",
+  "En låt till en strandpromenad",
+  "Sista dagen på resan",
+  "En låt till en flashback i en film",
+  "Att vara dum kär",
+  "En låt till sluttexterna i ditt liv",
+  "När du kommer på att du glömt nåt viktigt",
+  "Söndagsångest inför måndagen",
+  "En låt till en seger på fotbollsplanen",
+  "Att vara nykter på en blöt fest",
+  "En låt till en utomhusfest i juli",
+  "När du kör om någon på motorvägen",
+  "En låt till en lägenhetsfest",
+  "Att skita i allt och åka utomlands",
+  "En låt till en självömkanssession",
+  "Att bli förälskad i fel person",
+  "Den första låten du dansade till med ditt ex"
+];
+
+function impostorCount(n) {
+  if (n <= 6) return 1;
+  if (n <= 12) return 2;
+  return 3;
+}
+
+let totalPlayers = 0;
+let currentPlayer = 0;
+let impostors = new Set();
+let prompt = "";
+
+function show(id) {
+  ['setup','pass','reveal','done'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+function startGame() {
+  const n = parseInt(document.getElementById('players').value);
+  if (isNaN(n) || n < 3 || n > 20) { alert('Välj 3–20 spelare'); return; }
+  totalPlayers = n;
+  newRoundInternal();
+  show('pass');
+}
+
+function newRoundInternal() {
+  const k = impostorCount(totalPlayers);
+  const indices = [];
+  for (let i = 0; i < totalPlayers; i++) indices.push(i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  impostors = new Set(indices.slice(0, k));
+  prompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+  currentPlayer = 0;
+  updateLabel();
+}
+
+function updateLabel() {
+  document.getElementById('playerLabel').textContent =
+    `Spelare ${currentPlayer + 1} av ${totalPlayers}`;
+}
+
+function nextPlayer() {
+  currentPlayer++;
+  if (currentPlayer >= totalPlayers) {
+    show('done');
+  } else {
+    updateLabel();
+  }
+}
+
+function newRound() {
+  newRoundInternal();
+  show('pass');
+}
+
+const holdBtn = document.getElementById('holdBtn');
+let holding = false;
+
+function startHold(e) {
+  e.preventDefault();
+  if (holding) return;
+  holding = true;
+  holdBtn.classList.add('active');
+  const isImpostor = impostors.has(currentPlayer);
+  const content = isImpostor
+    ? `<div class="impostor">IMPOSTOR</div>
+       <p class="info" style="margin-top:32px">Du vet inte påståendet.<br>Lyssna på de andra och försök smälta in.</p>`
+    : `<h2>Påståendet är:</h2><div class="big">${prompt}</div>
+       <p class="info" style="margin-top:32px">Sätt på en låt som passar.</p>`;
+  document.getElementById('revealContent').innerHTML = content;
+  show('reveal');
+}
+
+function endHold(e) {
+  if (e) e.preventDefault();
+  if (!holding) return;
+  holding = false;
+  holdBtn.classList.remove('active');
+  show('pass');
+}
+
+holdBtn.addEventListener('touchstart', startHold, {passive: false});
+holdBtn.addEventListener('touchend', endHold);
+holdBtn.addEventListener('touchcancel', endHold);
+holdBtn.addEventListener('mousedown', startHold);
+holdBtn.addEventListener('mouseup', endHold);
+holdBtn.addEventListener('mouseleave', endHold);
+</script>
+</body>
+</html>
